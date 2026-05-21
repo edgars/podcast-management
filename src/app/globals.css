@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Tema inspirado no landing cybersec.Cast (hero escuro, violeta #7C3AED,
+ * realces lavanda #818CF8, tipografia geométrica + “.Cast” em script).
+ */
+
+@layer base {
+  :root {
+    --background: 280 20% 98%;
+    --foreground: 260 35% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 260 35% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 260 35% 10%;
+    --primary: 262 83% 52%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 265 14% 93%;
+    --secondary-foreground: 260 30% 14%;
+    --muted: 265 12% 93%;
+    --muted-foreground: 260 10% 38%;
+    --accent: 234 72% 58%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 265 12% 88%;
+    --input: 265 12% 88%;
+    --ring: 262 83% 52%;
+    --radius: 0.75rem;
+    --cyber-violet: 262 83% 52%;
+    --cyber-lavender: 234 72% 58%;
+    --cyber-glow: 265 88% 62%;
+  }
+
+  .dark {
+    --background: 240 14% 2.5%;
+    --foreground: 0 0% 99%;
+    --card: 260 22% 6.5%;
+    --card-foreground: 0 0% 98%;
+    --popover: 260 22% 6.5%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 262 83% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 260 16% 11%;
+    --secondary-foreground: 265 8% 92%;
+    --muted: 255 12% 13%;
+    --muted-foreground: 265 10% 64%;
+    --accent: 234 88% 72%;
+    --accent-foreground: 260 45% 12%;
+    --destructive: 0 62% 48%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 260 14% 16%;
+    --input: 260 14% 16%;
+    --ring: 262 83% 58%;
+    --cyber-violet: 262 83% 58%;
+    --cyber-lavender: 234 88% 72%;
+    --cyber-glow: 265 90% 68%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+@layer utilities {
+  .cc-grid-bg {
+    background-image:
+      linear-gradient(
+        to right,
+        hsl(var(--border) / 0.35) 1px,
+        transparent 1px
+      ),
+      linear-gradient(
+        to bottom,
+        hsl(var(--border) / 0.35) 1px,
+        transparent 1px
+      );
+    background-size: 56px 56px;
+    mask-image: radial-gradient(
+      ellipse 85% 65% at 50% 0%,
+      black 35%,
+      transparent 75%
+    );
+  }
+
+  .cc-radial-hero {
+    background:
+      radial-gradient(
+        ellipse 110% 80% at 50% -20%,
+        hsl(var(--primary) / 0.35),
+        transparent 55%
+      ),
+      radial-gradient(
+        ellipse 55% 50% at 100% 25%,
+        hsl(var(--accent) / 0.18),
+        transparent 55%
+      ),
+      radial-gradient(
+        ellipse 45% 45% at 0% 80%,
+        hsl(var(--primary) / 0.12),
+        transparent 50%
+      );
+  }
+
+  .cc-text-gradient-brand {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(
+      105deg,
+      hsl(var(--foreground)) 0%,
+      hsl(var(--accent)) 42%,
+      hsl(var(--primary)) 100%
+    );
+  }
+
+  .cc-glow-violet {
+    box-shadow:
+      0 0 40px -8px hsl(var(--primary) / 0.55),
+      0 0 80px -20px hsl(var(--accent) / 0.25);
+  }
+}

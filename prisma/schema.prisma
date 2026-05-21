@@ -1,0 +1,263 @@
+// CyberSec.CAST — Inteligência Executiva
+// PostgreSQL (Neon) + Prisma — use pooled URL em DATABASE_URL e URL direta em DIRECT_URL (migrations).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Conexão com pooler do Neon (recomendado em Vercel / serverless)
+  url       = env("DATABASE_URL")
+  // URL direta (sem pooler) — necessária para `prisma migrate` / introspection estável
+  directUrl = env("DIRECT_URL")
+}
+
+// ---------------------------------------------------------------------------
+// RBAC — Admin (produção) vs Painelista (convidado)
+// ---------------------------------------------------------------------------
+enum UserRole {
+  ADMIN
+  PANELIST
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  /// Hash bcrypt (NextAuth Credentials) — opcional se usar apenas OAuth depois
+  passwordHash  String?
+  role          UserRole  @default(PANELIST)
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  panelistProfile PanelistProfile?
+  invitesCreated  PanelistInvite[] @relation("InviteCreatedBy")
+  inviteUsed      PanelistInvite?   @relation("InviteConsumedBy")
+
+  accounts Account[]
+  sessions Session[]
+}
+
+// ---------------------------------------------------------------------------
+// NextAuth.js (adapter Prisma) — preparação para Etapa de autenticação
+// ---------------------------------------------------------------------------
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------------------------------------------------------------------------
+// Perfil executivo do painelista + convites por token (Admin → link único)
+// ---------------------------------------------------------------------------
+model PanelistProfile {
+  id        String @id @default(cuid())
+  userId    String @unique
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fullName          String
+  /// Pode espelhar o e-mail de login ou um e-mail corporativo de contato
+  contactEmail      String
+  currentTitle      String
+  company             String
+  executiveBio        String  @db.Text
+  linkedInUrl         String?
+  otherProfessionalUrl String?
+
+  /// Temas de interesse para debate (ex.: LGPD, Ransomware, IA na Segurança)
+  interestTopics String[]
+  /// Temas sensíveis ou confidenciais a evitar na gravação
+  topicsToAvoid  String[]
+
+  profileCompletedAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  episodeAppearances EpisodePanelist[]
+}
+
+model PanelistInvite {
+  id          String    @id @default(cuid())
+  token       String    @unique
+  /// E-mail opcional pré-informado pelo Admin (reforço de vínculo)
+  targetEmail String?
+  expiresAt   DateTime
+  consumedAt  DateTime?
+
+  createdById String
+  createdBy   User   @relation("InviteCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  consumedByUserId String? @unique
+  consumedBy       User?   @relation("InviteConsumedBy", fields: [consumedByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Temporadas e episódios (painéis, despesas e patrocínio por temporada)
+// ---------------------------------------------------------------------------
+model Season {
+  id        String   @id @default(cuid())
+  /// Número editorial da temporada (ex.: 1, 2)
+  number    Int?
+  title     String
+  synopsis  String?  @db.Text
+  startDate DateTime? @db.Date
+  endDate   DateTime? @db.Date
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  episodes        Episode[]
+  expenses        Expense[]
+  sponsorPayments SponsorPayment[]
+}
+
+enum EpisodeStatus {
+  PLANNED
+  RECORDED
+  PUBLISHED
+  CANCELLED
+}
+
+model Episode {
+  id          String        @id @default(cuid())
+  seasonId  String
+  season      Season        @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  /// Número do episódio dentro da temporada (ex.: 1, 2)
+  number      Int?
+  title       String
+  synopsis    String?       @db.Text
+  scheduledAt DateTime?     @db.Date
+  status      EpisodeStatus @default(PLANNED)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  panelists EpisodePanelist[]
+  expenses  Expense[]
+
+  @@index([seasonId])
+}
+
+/// Um episódio pode ter um ou mais painelistas (perfil executivo).
+model EpisodePanelist {
+  id                String   @id @default(cuid())
+  episodeId         String
+  panelistProfileId String
+  episode           Episode         @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+  panelistProfile   PanelistProfile @relation(fields: [panelistProfileId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now())
+
+  @@unique([episodeId, panelistProfileId])
+  @@index([panelistProfileId])
+}
+
+// ---------------------------------------------------------------------------
+// Patrocínio — cotas corporativas e receitas mensais por patrocinador
+// ---------------------------------------------------------------------------
+model SponsorshipQuota {
+  id                  String   @id @default(cuid())
+  name                String
+  monthlyAmount       Decimal  @db.Decimal(12, 2)
+  /// Contrapartidas editoriais / mídia (texto livre, ex.: logo na abertura, spot 30s)
+  counterpartiesNotes String   @db.Text
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  sponsorPayments SponsorPayment[]
+}
+
+enum MonthlyPaymentStatus {
+  PAID
+  PENDING
+  OVERDUE
+}
+
+/// Vínculo: cota + empresa patrocinadora + status do ciclo de faturamento mensal
+model SponsorPayment {
+  id        String @id @default(cuid())
+  quotaId   String
+  quota     SponsorshipQuota @relation(fields: [quotaId], references: [id], onDelete: Restrict)
+
+  sponsorCompanyName String
+  status               MonthlyPaymentStatus @default(PENDING)
+  /// Valor efetivamente acordado neste vínculo (permite diferir do valor padrão da cota)
+  agreedMonthlyAmount  Decimal              @db.Decimal(12, 2)
+  /// Competência do pagamento (ex.: primeiro dia do mês de referência)
+  billingMonth         DateTime             @db.Date
+
+  /// Opcional: vínculo editorial / financeiro com uma temporada.
+  seasonId String?
+  season   Season? @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([billingMonth])
+  @@index([status])
+  @@index([seasonId])
+}
+
+// ---------------------------------------------------------------------------
+// Despesas operacionais do podcast
+// ---------------------------------------------------------------------------
+enum ExpensePaymentStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+model Expense {
+  id          String               @id @default(cuid())
+  description String
+  amount      Decimal              @db.Decimal(12, 2)
+  dueDate     DateTime             @db.Date
+  status      ExpensePaymentStatus @default(PENDING)
+
+  /// Despesa alocada à temporada (ex.: marketing da temporada).
+  seasonId String?
+  season   Season? @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  /// Despesa específica de um episódio (ex.: edição só deste episódio).
+  episodeId String?
+  episode   Episode? @relation(fields: [episodeId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([dueDate])
+  @@index([status])
+  @@index([seasonId])
+  @@index([episodeId])
+}
