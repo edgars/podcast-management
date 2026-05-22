@@ -1,11 +1,13 @@
 import type { NextConfig } from "next";
 
 /**
- * Saída do build em `.next-local` (fora de `.next`) ajuda no Windows/OneDrive
- * com symlinks e evita artefactos corrompidos em `node_modules/.cache`.
+ * Saída em `.next-local` ajuda no Windows/OneDrive (symlinks / `.next` corrompido).
+ * Na Vercel (`VERCEL=1`) o output tem de ser o default `.next` — caso contrário o deploy falha.
  */
+const isVercel = Boolean(process.env.VERCEL);
+
 const nextConfig: NextConfig = {
-  distDir: ".next-local",
+  ...(!isVercel ? { distDir: ".next-local" } : {}),
   eslint: {
     ignoreDuringBuilds: true,
   },
